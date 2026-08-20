@@ -6,8 +6,10 @@ services:
     ports:
       - '8888:80'
     volumes:
-      # Mount REDCap versioned directory as web root (configurable via REDCAP_VERSION)
-      - ../upstream/versions/${REDCAP_VERSION:-16.1.9}/redcap:/var/www/html:ro
+      # Mount REDCap versioned directory as web root (configurable via REDCAP_VERSION).
+      # Convention `v<MAJOR>.<MINOR>.<PATCH>` (zero-padded) pour la sortabilité
+      # lexicographique des sous-répertoires de `upstream/versions/`.
+      - ../upstream/versions/${REDCAP_VERSION:-v16.01.09}/redcap:/var/www/html:ro
       - ./config/php.ini:/usr/local/etc/php/conf.d/redcap.ini:ro
       # Database configuration (override the empty one)
       - ./config/database.php:/var/www/html/database.php:ro
@@ -19,7 +21,7 @@ services:
       - REDCAP_DB_NAME=redcap
       - REDCAP_DB_USER=redcap
       - REDCAP_DB_PASSWORD=redcap_password
-      - REDCAP_VERSION=${REDCAP_VERSION:-16.1.9}
+      - REDCAP_VERSION=${REDCAP_VERSION:-v16.01.09}
     depends_on:
       mariadb:
         condition: service_healthy
