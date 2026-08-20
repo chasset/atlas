@@ -2,14 +2,24 @@
 set -euo pipefail
 
 # Prepare the REDCap source tree expected by docker/docker-compose.yml.
-# The REDCap ZIP itself is not committed; place it in cli/crf-openapi/upstream/
-# or set REDCAP_ZIP to an explicit archive path.
+#
+# Two supported workflows :
+#   1. Manual unzip : extract the official REDCap ZIP into
+#      `upstream/versions/v<MAJOR>.<MINOR>.<PATCH>/redcap/` (zero-padded
+#      for lexicographic sortability). This script detects it and exits 0.
+#   2. ZIP-based   : set REDCAP_ZIP to the official archive path
+#      (`redcap<version>.zip`, e.g. `redcap16.1.9.zip`). This script
+#      extracts it into the same versioned directory.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SANDBOX_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(cd "$SANDBOX_DIR/../.." && pwd)"
 
-REDCAP_VERSION="${REDCAP_VERSION:-16.1.9}"
+# Convention : `v` prefix + zero-padded segments (e.g. `v16.01.09`) pour
+# la sortabilité lexicographique des sous-répertoires de `upstream/versions/`.
+# Le ZIP officiel REDCap reste nommé `redcap<version>.zip` (sans `v` ni
+# padding) — utiliser `REDCAP_ZIP` pour pointer vers lui explicitement.
+REDCAP_VERSION="${REDCAP_VERSION:-v16.01.09}"
 VERSIONS_DIR="$SANDBOX_DIR/upstream/versions"
 SHARED_EDOCS_DIR="$SANDBOX_DIR/upstream/shared/edocs"
 TARGET_DIR="$VERSIONS_DIR/$REDCAP_VERSION/redcap"
@@ -34,7 +44,8 @@ fi
 if [ ! -f "$ZIP_PATH" ]; then
   echo "REDCap archive not found for version $REDCAP_VERSION."
   echo "Expected: $ZIP_PATH"
-  echo "Put redcap${REDCAP_VERSION}.zip in cli/crf-openapi/upstream/ or set REDCAP_ZIP."
+  echo "Either set REDCAP_ZIP to the official redcap<version>.zip path,"
+  echo "or manually unzip into $TARGET_DIR/redcap/ (see header comment)."
   exit 1
 fi
 

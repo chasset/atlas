@@ -37,7 +37,7 @@
     "@effect/platform": "~0.96.2",
     "@effect/printer": "~0.49.0",
     "@effect/printer-ansi": "~0.49.0",
-    "@hono/node-server": "~2.0.8",
+    "@hono/node-server": "~2.0.10",
     "@univ-lehavre/atlas-cli-toolkit": "workspace:*",
     "@univ-lehavre/atlas-crf": "workspace:*",
     "@univ-lehavre/atlas-crf-client": "workspace:*",

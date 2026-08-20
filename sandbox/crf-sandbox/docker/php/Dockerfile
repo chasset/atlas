@@ -16,7 +16,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure and install PHP extensions
+# Configure and install PHP extensions.
+# `opcache` est omis de `docker-php-ext-install` : compilé en statique
+# dans php:8.5-apache, la commande échoue avec `cp: cannot stat 'modules/*'`
+# car aucune extension partagée n'est produite. L'activation se fait via
+# php.ini (bloc redcap-recommended ci-dessous).
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         gd \
@@ -26,8 +30,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         intl \
         ldap \
         soap \
-        curl \
-        opcache
+        curl
 
 # Enable Apache modules
 RUN a2enmod rewrite headers
@@ -43,6 +46,11 @@ RUN { \
     echo 'max_input_time = 600'; \
     echo 'memory_limit = 512M'; \
     echo 'date.timezone = Europe/Paris'; \
+    echo 'opcache.enable = 1'; \
+    echo 'opcache.enable_cli = 1'; \
+    echo 'opcache.memory_consumption = 128'; \
+    echo 'opcache.max_accelerated_files = 10000'; \
+    echo 'opcache.revalidate_freq = 2'; \
 } > /usr/local/etc/php/conf.d/redcap-recommended.ini
 
 # Set working directory

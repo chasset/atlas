@@ -46,11 +46,17 @@ allowBuilds:
   sharp: false
 
 ignoredOptionalDependencies:
-  # sharp (optionalDependency d'astro) tire @img/sharp-libvips-* en LGPL.
-  # On ne l'installe pas : la doc n'utilise pas le service d'images Astro
-  # (logos servis statiquement depuis public/). Évite la licence LGPL sans
-  # exception à maintenir (ADR 0036).
+  # sharp est forcé à >=0.35.0 par l'override `sharp@<0.35.0` (CVE GHSA-f88m,
+  # transitive via @xenova/transformers) : c'est une dépendance RÉGULIÈRE de
+  # @xenova/transformers (pas optionnelle), donc l'entrée `sharp` ci-dessous ne
+  # l'exclut pas — il reste résolu, c'est voulu pour éteindre la CVE. En
+  # revanche ses optionalDeps `@img/sharp-libvips-*` (binaires libvips
+  # précompilés, LGPL-3.0-or-later) restent exclues : ADR 0036 (pas de LGPL
+  # sans exception). sharp reste « écarté » (allowBuilds: false → pas de build
+  # natif) ; les optionalDeps natives `@img/sharp-*` (Apache-2.0) ne sont pas
+  # concernées. Les tests n'invoquent pas l'inférence ONNX réelle.
   - sharp
+  - "@img/sharp-libvips-*"
 
 # Moved from the deprecated `pnpm.*` block in package.json: pnpm 10 reads
 # these from here, not from package.json (silent-ignore otherwise).
@@ -64,10 +70,18 @@ ignoredOptionalDependencies:
 # The conditional syntax leaves unaffected majors alone.
 overrides:
   "@isaacs/brace-expansion": ">=5.0.1"
+  # Paquet distinct de @isaacs/brace-expansion (l'ancien `brace-expansion` de
+  # jonschlinkert, tiré par minimatch/legacy glob). DoS unbounded expansion
+  # (GHSA-mh99) et bypass du fix intermediate-arrays (GHSA-rgw5) patchés en
+  # 5.0.9.
+  "brace-expansion@>=4.0.0 <5.0.9": ">=5.0.9"
   # Unbounded memory alloc dans la propagation W3C Baggage, patché en 2.8.0
   # (transitive via services__crf>@effect/opentelemetry).
   "@opentelemetry/core@<2.8.0": ">=2.8.0"
-  "@sveltejs/kit": ">=2.58.0"
+  # Prototype pollution (GHSA-866w) et crash payloads remote-form (GHSA-wqjv)
+  # patchés en 2.69.1 ; ReDoS content-negotiation (GHSA-29g2) patché en 2.70.2.
+  # Global : consommé comme peer `^2.0.0` partout, la 2.70.2 reste compatible.
+  "@sveltejs/kit": ">=2.70.2"
   # Plafond <1.6.21 : la 1.6.21 (« Support Chai-style expect chains ») confond
   # le matcher asymétrique `expect.any(...)` avec le flag Chai `any` → la règle
   # `vitest/valid-expect` le signale à tort « unknown modifier » sur
@@ -87,27 +101,53 @@ overrides:
   "cookie@<0.7.0 || >=2": ">=0.7.0 <2"
   defu: ">=6.1.7"
   devalue: ">=5.8.1"
-  # Scoped au major 3.x (transitive via docs>mermaid) ; le quadratic-DoS et
-  # les bypass IN_PLACE sont patchés en 3.4.7.
-  "dompurify@<3.4.7": ">=3.4.7"
+  # Stack exhaustion sur graphes récursifs (GHSA-ggr8) patché en 8.0.0.
+  # eslint-plugin-functional (~9.0.5) déclare deepmerge-ts ^7.1.5 ; la 8.x
+  # garde l'export `deepmerge` (CJS+ESM) — l'override est sûr, vérifié par le
+  # job Lint (config shared-config).
+  "deepmerge-ts@<8.0.0": ">=8.0.0"
+  # Scoped au major 3.x (transitive via docs>mermaid) ; le quadratic-DoS, les
+  # bypass IN_PLACE et le IN_PLACE hook removal (XSS détaché, GHSA-55q2) sont
+  # patchés en 3.4.13.
+  "dompurify@<3.4.13": ">=3.4.13"
   effect: ">=3.21.2"
   "esbuild@<0.28.1": ">=0.28.1"
-  fast-uri: ">=3.1.2"
+  # Host confusion (backslash authority GHSA-v2hh, failed IDN canonicalization
+  # GHSA-4c8g et GHSA-7p8r) patchées en 3.1.5 (transitive via ajv>fast-uri,
+  # commitlint & openapi-response-validator).
+  fast-uri: ">=3.1.5"
   fast-xml-parser: ">=5.7.2"
   flatted: ">=3.4.2"
-  # Plancher 4.2.0 (advisory merge-key DoS) ET plafond <5 : js-yaml 5.x est
-  # ESM-only (plus d'export `default`), or @astrojs/internal-helpers fait
-  # `import yaml from "js-yaml"` → `astro build` casse (« does not provide an
-  # export named 'default' », job Documentation). La 4.x couvre l'advisory ; la
-  # 5.x n'apporte rien ici. À relever quand Astro consommera js-yaml 5 (named).
-  "js-yaml@>=4.0.0 <5": ">=4.2.0 <5"
+  # Plancher 4.3.1 (advisory merge-key DoS GHSA-52cp + !!omap quadratic
+  # GHSA-5p4m en 4.x) ET plafond <5 : js-yaml 5.x est ESM-only (plus d'export
+  # `default`), or @astrojs/internal-helpers fait `import yaml from "js-yaml"`
+  # → `astro build` casse (« does not provide an export named 'default' », job
+  # Documentation). La 4.x couvre les advisory ; la 5.x n'apporte rien ici.
+  # À relever quand Astro consommera js-yaml 5 (named).
+  "js-yaml@>=4.0.0 <5": ">=4.3.1 <5"
+  # Major 3.x tiré par @istanbuljs/load-nyc-config (via jest/storybook,
+  # ui__atlas-ui) ; le !!omap quadratic (GHSA-5p4m) est backporté en 3.15.1.
+  # Plafond <4 : la 4.x est ESM-only, casserait les consumers CJS du 3.x.
+  "js-yaml@>=3.0.0 <3.15.1": ">=3.15.1 <4"
   lodash: ">=4.18.1"
   lodash-es: ">=4.18.1"
   minimatch: ">=10.2.5"
+  # Boucle infinie des custom generators quand size vaut zéro (GHSA-2v37)
+  # patchée en 3.3.18 ; transitif via vite>postcss>nanoid.
+  "nanoid@<3.3.18": ">=3.3.18"
   picomatch: ">=4.0.4"
-  # Both 7.x (used by @xenova/transformers) and 8.x have separate CVEs ;
-  # cover each major in its own scoped override.
-  "protobufjs@<7.5.8": ">=7.5.8"
+  # Path traversal auto-loading sourceMappingURL (GHSA-r28c high) et fix
+  # incomplet GHSA-6g55 (GHSA-fxqj moderate) patchés en 8.5.23 ; transitif
+  # via vite et eslint-plugin-svelte.
+  "postcss@<8.5.23": ">=8.5.23"
+  # @xenova/transformers (packages citation & researcher-profiles) tire
+  # onnx-proto@4.x qui déclare protobufjs ^6.11.2 (résolu 6.11.6). Les advisory
+  # couvrent aussi la 6.x (critical RCE GHSA-xq3m <7.5.5, high <=7.5.5/<=7.6.0,
+  # moderate <=7.6.2) : pas de backport 6.x, seul levier = forcer la 7.6.5+.
+  # onnx-proto étant du code généré par CLI protobufjs 6.x, l'override 6→7 est
+  # risqué (API runtime) : vérifié par build+test de citation & researcher-profiles.
+  # 8.x (grpc, @grpc/proto-loader) a son CVE séparé, scopé à part.
+  "protobufjs@<7.6.5": ">=7.6.5"
   "protobufjs@>=8.0.0 <8.2.0": ">=8.2.0"
   # @manypkg/get-packages@1.1.3 (via @changesets/cli) épingle read-yaml-file
   # 1.x → js-yaml 3.14.2, vulnérable au merge-key DoS. La 2.1.0 reste CJS
@@ -115,10 +155,20 @@ overrides:
   # et casserait le require() de manypkg, donc on borne à <3.
   "read-yaml-file@<2.0.0": "2.1.0"
   rollup: ">=4.60.2"
-  # TLS cert bypass, WebSocket DoS, cross-origin routing & cross-user info
-  # disclosure (GHSA-vmh5-mc38-953g / vxpw-j846-p89q / hm92-r4w5-c3mj + 1
-  # moderate) patchés en 7.28.0 ; transitif via jsdom et @effect/platform-node.
-  undici: ">=7.28.0 <8"
+  # CVE libvips (GHSA-f88m) patché en 0.35.0 ; transitif via
+  # @xenova/transformers (packages citation & researcher-profiles). sharp reste
+  # `false` dans allowBuilds (ADR 0036) : son postinstall ne tourne pas, on
+  # monte seulement la version résolue pour éteindre l'advisory sans exécuter
+  # le build natif (libvips LGPL écarté).
+  "sharp@<0.35.0": ">=0.35.0"
+  # removeScripts laisse des scripts exécutables (GHSA-2p49) patché en 4.0.2 ;
+  # transitif via astro (docs>@astrojs/starlight>astro>svgo).
+  "svgo@>=4.0.0 <4.0.2": ">=4.0.2"
+  # TLS cert bypass, WebSocket DoS, cross-origin routing, cross-user info
+  # disclosure, CRLF injection, cache-control/cookie injection et degenerate
+  # private cache directives (multiples GHSA) patchés en 7.29.0 ; transitif
+  # via jsdom (vitest) et @effect/platform-node.
+  undici: ">=7.29.0 <8"
   # Buffer bounds check manquant dans uuid v3/v5/v6 (GHSA-w5hq-g745-h8pq,
   # « <11.1.1 »). Tiré par `@storybook/test-runner` (uuid@^8.3.2, audit a11y,
   # dev/CI seulement) et par d'autres consommateurs en v11. On force la version
