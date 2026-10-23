@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@univ-lehavre/atlas-crf-core": "workspace:*",
-    "csv-parse": "~7.0.1"
+    "csv-parse": "~7.0.3"
   },
   "devDependencies": {
     "@univ-lehavre/atlas-shared-config": "workspace:*",
