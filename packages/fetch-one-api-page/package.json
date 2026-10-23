@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "effect": "~3.21.4",
-    "qs": "~6.15.3"
+    "qs": "~6.16.1"
   },
   "devDependencies": {
     "@effect/vitest": "^0.29.0",
